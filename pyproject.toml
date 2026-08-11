@@ -102,6 +102,13 @@ eval = [
     "mlflow>=3.0,<4.0",
 ]
 
+# Onboarding a third-party/vendor agent that only exposes a plain REST
+# webhook, not MCP (conet.gateway.webhook) — see README "Governing
+# third-party and vendor agents".
+webhook = [
+    "httpx>=0.27,<1.0",
+]
+
 # Everything a contributor needs to develop and test
 dev = [
     "pytest>=8.0,<9.0",

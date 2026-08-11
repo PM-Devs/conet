@@ -7,8 +7,10 @@
   <button type="submit">search</button>
   <a href="/dashboard/audit">clear</a>
 </form>
+<p class="muted">Live tail of the most recent records{% if trace_id %} for trace_id={{ trace_id }}{% endif %}. Updates every few seconds.</p>
 <table id="audit-table">
   <tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Outcome</th><th>Trace</th></tr>
+  <tbody id="audit-body">
   {% for e in events %}
   <tr>
     <td>{{ e.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
@@ -21,5 +23,46 @@
   {% else %}
   <tr><td colspan="6" class="muted">No audit records{% if trace_id %} for trace_id={{ trace_id }}{% endif %}.</td></tr>
   {% endfor %}
+  </tbody>
 </table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function currentTraceId() {
+    return new URLSearchParams(location.search).get('trace_id') || '';
+  }
+
+  function renderAudit(events) {
+    const body = document.getElementById('audit-body');
+    if (!body) return;  // an HTMX search swap can replace #audit-table (and this tbody) between ticks
+    if (!events.length) {
+      const suffix = currentTraceId() ? ' for trace_id=' + escapeHtml(currentTraceId()) : '';
+      body.innerHTML = `<tr><td colspan="6" class="muted">No audit records${suffix}.</td></tr>`;
+      return;
+    }
+    body.innerHTML = events.map(e => `<tr>
+      <td>${escapeHtml(e.timestamp.replace('T', ' ').slice(0, 19))}</td>
+      <td>${escapeHtml(e.actor)}</td>
+      <td>${escapeHtml(e.action)}</td>
+      <td>${escapeHtml(e.resource)}</td>
+      <td class="status-${e.outcome.toLowerCase()}">${escapeHtml(e.outcome)}</td>
+      <td>${e.trace_id ? `<a href="/dashboard/audit?trace_id=${encodeURIComponent(e.trace_id)}">${escapeHtml(e.trace_id.slice(0, 8))}</a>` : '-'}</td>
+    </tr>`).join('');
+  }
+
+  async function pollAudit() {
+    const tid = currentTraceId();
+    const qs = tid ? '?trace_id=' + encodeURIComponent(tid) : '';
+    try {
+      const res = await fetch('/dashboard/api/audit' + qs, {headers: {'Accept': 'application/json'}});
+      if (res.ok) renderAudit(await res.json());
+    } catch (err) {
+      console.warn('audit poll failed', err);
+    }
+  }
+
+  pollAudit();
+  setInterval(pollAudit, 4000);
+</script>
 {% endblock %}

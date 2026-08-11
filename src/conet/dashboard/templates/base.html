@@ -13,11 +13,25 @@
     main { flex: 1; padding: 1.25rem 1.5rem; max-width: 1100px; }
     table { border-collapse: collapse; width: 100%; margin: .75rem 0; }
     th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid #8883; font-size: .9rem; }
-    .status-ok { color: #2a2; } .status-denied, .status-failed { color: #c33; } .status-pending { color: #c90; }
+    .status-ok, .status-completed { color: #2a2; }
+    .status-denied, .status-failed, .status-rejected, .status-timed_out { color: #c33; }
+    .status-pending, .status-waiting_approval, .status-running, .status-routing, .status-authorizing { color: #c90; }
+    .status-cancelled, .status-cancelling { color: #888; }
     form.inline { display: inline; }
     button { font-family: inherit; cursor: pointer; }
     .card { border: 1px solid #8884; border-radius: 6px; padding: .75rem 1rem; margin-bottom: 1rem; }
     .muted { opacity: .65; font-size: .85rem; }
+    .stats-strip { display: flex; gap: 1.5rem; margin: .5rem 0 1rem; }
+    .stat { border: 1px solid #8884; border-radius: 6px; padding: .5rem .9rem; }
+    .stat .n { font-size: 1.3rem; font-weight: bold; display: block; }
+    .stat .label { font-size: .75rem; opacity: .65; }
+    .stat.warn .n { color: #c33; }
+    #graph { width: 100%; height: 360px; border: 1px solid #8884; border-radius: 6px; }
+    #graph text { font-size: 11px; font-family: inherit; }
+    #graph .node circle { stroke-width: 1.5px; }
+    #graph .edge { stroke: #8886; fill: none; }
+    #graph .edge.warm { stroke: #f9a825; }
+    #graph .edge.hot { stroke: #ea4335; }
   </style>
 </head>
 <body>
@@ -35,5 +49,27 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <script>
+    // Shared by pages that want a live-updating view without a JS
+    // framework: call once, it re-fetches JSON on an interval and hands
+    // it to `onData`. A failed fetch (server restarting, network blip)
+    // is logged and skipped rather than stopping the poll loop.
+    function conetPoll(url, onData, intervalMs) {
+      async function tick() {
+        try {
+          const res = await fetch(url, {headers: {'Accept': 'application/json'}});
+          if (res.ok) onData(await res.json());
+        } catch (err) {
+          console.warn('conetPoll: fetch failed for', url, err);
+        }
+      }
+      tick();
+      return setInterval(tick, intervalMs || 4000);
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+  </script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

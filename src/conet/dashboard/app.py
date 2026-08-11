@@ -13,6 +13,36 @@ from conet.dashboard.services import DashboardServices
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 
+def _network_payload(agents, tasks, pending_approvals, recent_audit) -> dict:
+    """Nodes + edges for the network graph, and the monitoring stats strip
+    above it. Edge direction/volume/last state come from recent tasks
+    (list_recent_tasks is newest-first, so the first task seen per
+    requester/provider pair is its most recent one)."""
+    nodes = [
+        {'name': a.name, 'department': a.department, 'framework': a.framework,
+         'skills': [s.skill_id for s in a.skills]}
+        for a in agents
+    ]
+    edge_counts: dict[tuple[str, str], dict] = {}
+    for task in tasks:
+        if task.provider is None:
+            continue
+        key = (task.requester, task.provider)
+        entry = edge_counts.setdefault(key, {'count': 0, 'last_state': task.state})
+        entry['count'] += 1
+    edges = [
+        {'source': src, 'target': dst, 'count': v['count'], 'last_state': v['last_state']}
+        for (src, dst), v in edge_counts.items()
+    ]
+    stats = {
+        'agents': len(agents),
+        'recent_tasks': len(tasks),
+        'denied_recent': sum(1 for e in recent_audit if e.outcome == 'DENIED'),
+        'pending_approvals': len(pending_approvals),
+    }
+    return {'nodes': nodes, 'edges': edges, 'stats': stats}
+
+
 def create_dashboard_app(services: DashboardServices) -> FastAPI:
     """One console where an operator sees the network, watches traffic,
     changes policy, approves tasks, and manages people (Feature Plan §B).
@@ -105,7 +135,19 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
     @app.get('/dashboard/network')
     async def network(request: Request, user: User = Depends(current_user)):
         agents = await services.store.list_all_agents()
-        return render(request, 'network.html', 'network', agents=agents, current_user=user)
+        tasks = await services.store.list_recent_tasks(limit=200)
+        pending = await services.store.list_pending_approvals()
+        recent_audit = await services.store.list_audit_events(limit=200)
+        graph = _network_payload(agents, tasks, pending, recent_audit)
+        return render(request, 'network.html', 'network', agents=agents, current_user=user, graph=graph)
+
+    @app.get('/dashboard/api/network')
+    async def network_api(user: User = Depends(current_user)):
+        agents = await services.store.list_all_agents()
+        tasks = await services.store.list_recent_tasks(limit=200)
+        pending = await services.store.list_pending_approvals()
+        recent_audit = await services.store.list_audit_events(limit=200)
+        return _network_payload(agents, tasks, pending, recent_audit)
 
     # --- live traffic (F11, derived from Task/audit records) ---
 
@@ -113,6 +155,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
     async def traffic(request: Request, user: User = Depends(current_user)):
         tasks = await services.store.list_recent_tasks()
         return render(request, 'traffic.html', 'traffic', tasks=tasks, current_user=user)
+
+    @app.get('/dashboard/api/traffic')
+    async def traffic_api(user: User = Depends(current_user)):
+        return await services.store.list_recent_tasks()
 
     # --- policy editor (F6) ---
 
@@ -181,6 +227,11 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
         await require(user, 'view_audit')
         events = await services.store.list_audit_events(trace_id=trace_id)
         return render(request, 'audit.html', 'audit', current_user=user, events=events, trace_id=trace_id)
+
+    @app.get('/dashboard/api/audit')
+    async def audit_api(trace_id: str | None = None, user: User = Depends(current_user)):
+        await require(user, 'view_audit')
+        return await services.store.list_audit_events(trace_id=trace_id, limit=100)
 
     # --- integrations / MCP gateway (F12) ---
 

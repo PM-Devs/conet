@@ -144,26 +144,48 @@ class MCPGateway:
         logger.info('mcp gateway: imported %d capabilities from server=%s', len(skills), server_name)
         return skills
 
-    async def invoke_external_capability(self, requester: str, skill_id: str, payload: dict) -> dict:
-        """Passes through the same authorize + audit path internal tasks use."""
+    async def _call_tool(self, skill_id: str, payload: dict) -> dict:
+        """The actual external call, with no authorize/audit of its own --
+        both callers below wrap it with exactly one of each, against the
+        identity that's actually meaningful in their context."""
         mapping = self._capabilities.get(skill_id)
         if mapping is None:
             raise UnknownCapabilityError(f'skill_id {skill_id!r} is not an imported MCP capability')
         server_name, tool_name = mapping
+        result = await self._servers[server_name].require_session().call_tool(tool_name, payload)
+        return {'content': [block.model_dump() for block in result.content]}
+
+    async def invoke_external_capability(self, requester: str, skill_id: str, payload: dict) -> dict:
+        """Passes through the same authorize + audit path internal tasks use.
+        For direct callers -- the dashboard's Integrations panel, an
+        orchestrator -- that hold a reference to this gateway and know who's
+        really asking."""
+        if skill_id not in self._capabilities:
+            raise UnknownCapabilityError(f'skill_id {skill_id!r} is not an imported MCP capability')
 
         if not await self._policy.authorize(requester, skill_id, 'invoke'):
             await self._audit(requester, skill_id, 'DENIED')
             raise PermissionError(f'{requester!r} is not authorized to invoke {skill_id!r}')
 
         try:
-            result = await self._servers[server_name].require_session().call_tool(tool_name, payload)
+            result = await self._call_tool(skill_id, payload)
         except Exception:
             logger.exception('mcp gateway: call_tool failed for skill_id=%s', skill_id)
             await self._audit(requester, skill_id, 'FAILED')
             raise
 
         await self._audit(requester, skill_id, 'OK')
-        return {'content': [block.model_dump() for block in result.content]}
+        return result
+
+    async def invoke_capability_unchecked(self, skill_id: str, payload: dict) -> dict:
+        """For GatewayAdapter only: when the gateway is exposed as a normal
+        CoNET agent, its own SkillServer.Execute() has already authorized
+        and will audit the *true* requester (extracted from the caller's
+        signed auth_context) before and after calling this. Re-running
+        authorize()/audit() here would only ever check the gateway's own
+        synthetic identity, not the real one -- so this deliberately skips
+        both and just makes the call."""
+        return await self._call_tool(skill_id, payload)
 
     async def _audit(self, requester: str, skill_id: str, outcome) -> None:
         if self._store is not None:

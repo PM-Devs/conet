@@ -1,17 +1,19 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Protocol, runtime_checkable
 
 import grpc
 from google.protobuf.struct_pb2 import Struct
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
+from conet.control.approvals import ApprovalWorkflow
 from conet.control.policy import PolicyEngine
 from conet.observability.tracing import audit
 from conet.persistence.store import Store
 from conet.protocols.grpc import skillruntime_pb2 as pb2
 from conet.protocols.grpc import skillruntime_pb2_grpc as pb2_grpc
-from conet.sdk.manifests import AgentManifest, AuditOutcome, Task, TaskState
+from conet.sdk.manifests import AgentManifest, AuditOutcome, SkillDef, Task, TaskState
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +37,62 @@ class SkillServer(pb2_grpc.SkillRuntimeServicer):
 
     def __init__(
         self, manifest: AgentManifest, adapter: SkillAdapter, policy_engine: PolicyEngine, store: Store | None = None,
+        approvals: ApprovalWorkflow | None = None, approvers: list[str] | None = None,
+        approval_ttl_seconds: int = 3600, approval_poll_interval_seconds: float = 1.0,
     ) -> None:
         self._provider_name = manifest.name
         self._skills_by_id = {skill.skill_id: skill for skill in manifest.skills}
         self._adapter = adapter
         self._policy = policy_engine
         self._store = store
+        # F7 auto-gating: an unsafe_write Skill pauses at the approval queue
+        # before invoke() runs, iff both an ApprovalWorkflow and at least one
+        # approver are configured. Neither is required -- omitting them
+        # keeps every existing Skill's behavior exactly as it was.
+        self._approvals = approvals
+        self._approvers = approvers or []
+        self._approval_ttl_seconds = approval_ttl_seconds
+        self._approval_poll_interval_seconds = approval_poll_interval_seconds
         self._running_tasks: dict[str, asyncio.Task] = {}
 
+    def _requires_approval(self, skill: SkillDef) -> bool:
+        return self._approvals is not None and bool(self._approvers) and skill.side_effects == 'unsafe_write'
+
+    async def _await_approval(self, request) -> pb2.SkillResponse | None:
+        """Blocks until a human decides, or the approval expires. Returns
+        None if approved (the caller should proceed to invoke the adapter),
+        or a terminal SkillResponse to return directly otherwise.
+
+        Task/Approval state and their audit trail stay owned end to end by
+        ApprovalWorkflow (request_approval/approve/reject/expire_overdue) --
+        this only polls for the outcome and translates it into a gRPC
+        response; it never mutates that state itself.
+        """
+        assert self._approvals is not None and self._store is not None
+        approval = await self._approvals.request_approval(
+            task_id=request.task_id, approvers=self._approvers, ttl_seconds=self._approval_ttl_seconds,
+        )
+        while True:
+            current = await self._store.get_approval(approval.approval_id)
+            assert current is not None, 'the approval this method just created must exist'
+            if current.state == 'APPROVED':
+                return None
+            if current.state == 'REJECTED':
+                return pb2.SkillResponse(status=pb2.DENIED, error_detail='rejected by approver')
+            if current.state == 'EXPIRED':
+                return pb2.SkillResponse(status=pb2.TIMED_OUT, error_detail='approval expired without a decision')
+            if current.expires_at <= datetime.now(timezone.utc):
+                await self._approvals.expire_overdue()
+                return pb2.SkillResponse(status=pb2.TIMED_OUT, error_detail='approval expired without a decision')
+            await asyncio.sleep(self._approval_poll_interval_seconds)
+
     async def _authorize_request(self, request) -> tuple[dict | None, str | None]:
-        """Returns (claims, error_detail). claims is None iff error_detail is set.
+        """Returns (claims, error_detail); error_detail is None iff
+        authorized. claims is None for the failure modes where the subject
+        isn't trustworthy yet (bad signature, skill_id mismatch) — but once
+        the token itself checks out, claims is returned even on an
+        authorize() denial, so the denial's audit record can name who was
+        actually denied instead of 'unknown' (FR-022).
 
         Verifying the token's signature is not enough on its own — nothing
         stops something upstream from minting a token without having called
@@ -59,7 +107,7 @@ class SkillServer(pb2_grpc.SkillRuntimeServicer):
         if request.skill_id not in self._skills_by_id:
             return None, f'unknown skill_id {request.skill_id!r}'
         if not await self._policy.authorize(claims['sub'], request.skill_id, 'invoke'):
-            return None, f"{claims['sub']!r} is not authorized to invoke {request.skill_id!r}"
+            return claims, f"{claims['sub']!r} is not authorized to invoke {request.skill_id!r}"
         return claims, None
 
     async def _record(self, request, requester: str, state: TaskState) -> None:
@@ -113,6 +161,12 @@ class SkillServer(pb2_grpc.SkillRuntimeServicer):
         await self._record(request, requester, state='RUNNING')
         self._claim_task(request.task_id)
         try:
+            if self._requires_approval(skill):
+                gate_response = await self._await_approval(request)
+                if gate_response is not None:
+                    return gate_response
+                await self._record(request, requester, state='RUNNING')  # resumed after approval
+
             result = await self._adapter.invoke(request.skill_id, payload)
         except asyncio.CancelledError:
             await self._record(request, requester, state='CANCELLED')
@@ -186,9 +240,16 @@ _HEALTH_SERVICE_NAME = 'conet.runtime.SkillRuntime'
 
 async def serve(
     manifest: AgentManifest, adapter: SkillAdapter, policy_engine: PolicyEngine, port: int, store: Store | None = None,
+    approvals: ApprovalWorkflow | None = None, approvers: list[str] | None = None,
+    approval_ttl_seconds: int = 3600, approval_poll_interval_seconds: float = 1.0,
 ) -> grpc.aio.Server:
     server = grpc.aio.server()
-    pb2_grpc.add_SkillRuntimeServicer_to_server(SkillServer(manifest, adapter, policy_engine, store), server)
+    skill_server = SkillServer(
+        manifest, adapter, policy_engine, store,
+        approvals=approvals, approvers=approvers,
+        approval_ttl_seconds=approval_ttl_seconds, approval_poll_interval_seconds=approval_poll_interval_seconds,
+    )
+    pb2_grpc.add_SkillRuntimeServicer_to_server(skill_server, server)
 
     # F8 (health & lifecycle): standard gRPC health checking (proven in Stage A's
     # A2 prototype), so the runtime — and a future Router/F5 — can tell a live

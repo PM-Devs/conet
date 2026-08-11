@@ -4,10 +4,11 @@ import os
 
 import pytest
 
+from conet.control.approvals import ApprovalWorkflow
 from conet.control.policy import PolicyEngine
 from conet.persistence.store import Store
 from conet.runtime.server import serve
-from conet.sdk.manifests import AgentManifest, SkillDef
+from conet.sdk.manifests import AgentManifest, SkillDef, Task
 
 _FIXTURE_POLICY = os.path.join(os.path.dirname(__file__), 'fixtures', 'policy_double_value.csv')
 
@@ -109,3 +110,58 @@ async def test_cancel_reaches_the_real_provider_and_stops_the_task(db_path, caps
     await channel.close()
     await grpc_server.stop(None)
     await store.close()
+
+
+async def test_approvals_reports_none_pending(db_path, capsys):
+    await cli._approvals()
+    assert 'No pending approvals' in capsys.readouterr().out
+
+
+async def test_approvals_lists_a_pending_approval(db_path, capsys):
+    store = Store(db_path)
+    await store.save_task(Task(task_id='t-approvals', requester='finance-agent', skill_id='finance.issue_refund'))
+    workflow = ApprovalWorkflow(store)
+    await workflow.request_approval('t-approvals', approvers=['approver@example.com'])
+    await store.close()
+
+    await cli._approvals()
+    out = capsys.readouterr().out
+    assert 'task=t-approvals' in out
+    assert 'approver@example.com' in out
+
+
+async def test_approve_reports_unknown_approval(db_path, capsys):
+    await cli._decide('does-not-exist', 'approver@example.com', approve=True)
+    assert 'No such approval' in capsys.readouterr().out
+
+
+async def test_approve_unblocks_the_task(db_path, capsys):
+    store = Store(db_path)
+    await store.save_task(Task(task_id='t-cli-approve', requester='finance-agent', skill_id='finance.issue_refund'))
+    workflow = ApprovalWorkflow(store)
+    approval = await workflow.request_approval('t-cli-approve', approvers=['approver@example.com'])
+    await store.close()
+
+    await cli._decide(approval.approval_id, 'approver@example.com', approve=True)
+    assert 'approved by approver@example.com' in capsys.readouterr().out
+
+    store = Store(db_path)
+    task = await store.get_task('t-cli-approve')
+    await store.close()
+    assert task.state == 'ROUTING'
+
+
+async def test_reject_marks_the_task_rejected(db_path, capsys):
+    store = Store(db_path)
+    await store.save_task(Task(task_id='t-cli-reject', requester='finance-agent', skill_id='finance.issue_refund'))
+    workflow = ApprovalWorkflow(store)
+    approval = await workflow.request_approval('t-cli-reject', approvers=['approver@example.com'])
+    await store.close()
+
+    await cli._decide(approval.approval_id, 'approver@example.com', approve=False)
+    assert 'rejected by approver@example.com' in capsys.readouterr().out
+
+    store = Store(db_path)
+    task = await store.get_task('t-cli-reject')
+    await store.close()
+    assert task.state == 'REJECTED'

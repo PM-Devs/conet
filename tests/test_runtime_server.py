@@ -111,6 +111,28 @@ async def test_execute_denied_when_token_skill_id_mismatches_request(running_ser
     assert resp.status == pb2.DENIED
 
 
+async def test_execute_denial_audit_names_the_real_subject_not_unknown(policy, adapter, tmp_path):
+    # a validly-signed token for an unauthorized subject must still be
+    # attributed to that subject in the audit trail, not 'unknown' --
+    # claims were already verified by the time authorize() said no.
+    store = Store(str(tmp_path / 'conet.db'))
+    grpc_server = await serve(make_manifest(), adapter, policy, port=50162, store=store)
+    channel = grpc.aio.insecure_channel('localhost:50162')
+    stub = pb2_grpc.SkillRuntimeStub(channel)
+    try:
+        token = policy.mint_auth_context('marketing', SKILL_ID)
+        req = pb2.SkillRequest(skill_id=SKILL_ID, task_id='t-audit-denied', auth_context=token, input=to_struct({'value': 1}))
+        resp = await stub.Execute(req)
+        assert resp.status == pb2.DENIED
+    finally:
+        await channel.close()
+        await grpc_server.stop(None)
+
+    events = await store.list_audit_events()
+    await store.close()
+    assert any(e.actor == 'marketing' and e.outcome == 'DENIED' for e in events)
+
+
 async def test_execute_failed_on_bad_input_never_reaches_adapter(running_server, policy):
     resp = await running_server.Execute(request(policy, 't4', {'value': 'not-an-int'}))
     assert resp.status == pb2.FAILED

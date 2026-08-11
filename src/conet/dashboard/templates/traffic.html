@@ -2,20 +2,44 @@
 {% block title %}Live traffic{% endblock %}
 {% block content %}
 <h1>Live traffic</h1>
-<p class="muted">Most recent {{ tasks|length }} task(s). Click a task_id to see its full trace on the Audit log panel.</p>
+<p class="muted">Most recent task(s), newest first. Click a task_id to see its full trace on the Audit log panel. Updates every few seconds.</p>
 <table>
   <tr><th>Task</th><th>Requester</th><th>Provider</th><th>Skill</th><th>State</th><th>Trace</th></tr>
+  <tbody id="traffic-body">
   {% for task in tasks %}
   <tr>
     <td>{{ task.task_id[:8] }}</td>
     <td>{{ task.requester }}</td>
     <td>{{ task.provider or "-" }}</td>
     <td>{{ task.skill_id }}</td>
-    <td>{{ task.state }}</td>
+    <td class="status-{{ task.state|lower }}">{{ task.state }}</td>
     <td>{% if task.trace_id %}<a href="/dashboard/audit?trace_id={{ task.trace_id }}">{{ task.trace_id[:8] }}</a>{% else %}-{% endif %}</td>
   </tr>
   {% else %}
   <tr><td colspan="6" class="muted">No tasks recorded yet.</td></tr>
   {% endfor %}
+  </tbody>
 </table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function renderTraffic(tasks) {
+    const body = document.getElementById('traffic-body');
+    if (!tasks.length) {
+      body.innerHTML = '<tr><td colspan="6" class="muted">No tasks recorded yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = tasks.map(t => `<tr>
+      <td>${escapeHtml(t.task_id.slice(0, 8))}</td>
+      <td>${escapeHtml(t.requester)}</td>
+      <td>${t.provider ? escapeHtml(t.provider) : '-'}</td>
+      <td>${escapeHtml(t.skill_id)}</td>
+      <td class="status-${t.state.toLowerCase()}">${escapeHtml(t.state)}</td>
+      <td>${t.trace_id ? `<a href="/dashboard/audit?trace_id=${encodeURIComponent(t.trace_id)}">${escapeHtml(t.trace_id.slice(0, 8))}</a>` : '-'}</td>
+    </tr>`).join('');
+  }
+
+  conetPoll('/dashboard/api/traffic', renderTraffic, 4000);
+</script>
 {% endblock %}

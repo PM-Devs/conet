@@ -186,22 +186,32 @@ class Store:
             logger.exception('append_audit failed for %s', event.event_id)
             raise
 
-    async def list_audit_events(self, trace_id: str | None = None) -> list[AuditEvent]:
+    async def list_audit_events(self, trace_id: str | None = None, limit: int | None = None) -> list[AuditEvent]:
         """Not part of B1's original 5-method contract; the ledger is
         append-only by design (append_audit), but something has to be able
         to read it back — for an operator's audit search (Feature Plan §B)
-        and for verifying "an audit record explains what happened" (SRS §10)."""
+        and for verifying "an audit record explains what happened" (SRS §10).
+
+        limit=None (the default) preserves the original contract: every
+        matching event, oldest first. Passing limit bounds it to the most
+        recent N instead, for the dashboard's live log tail — still
+        returned oldest-first, so newest-at-the-bottom reads the same way
+        whether or not a limit was applied."""
         try:
             db = await self._connection()
             query = 'SELECT event_json FROM audit'
-            params: tuple[str, ...] = ()
+            params: list[str | int] = []
             if trace_id is not None:
                 query += ' WHERE json_extract(event_json, "$.trace_id") = ?'
-                params = (trace_id,)
-            query += ' ORDER BY timestamp'
+                params.append(trace_id)
+            query += ' ORDER BY timestamp DESC' if limit is not None else ' ORDER BY timestamp'
+            if limit is not None:
+                query += ' LIMIT ?'
+                params.append(limit)
             async with db.execute(query, params) as cursor:
                 rows = await cursor.fetchall()
-            return [AuditEvent.model_validate_json(row[0]) for row in rows]
+            events = [AuditEvent.model_validate_json(row[0]) for row in rows]
+            return list(reversed(events)) if limit is not None else events
         except Exception:
             logger.exception('list_audit_events failed')
             raise

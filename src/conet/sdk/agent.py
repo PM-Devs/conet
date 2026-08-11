@@ -4,6 +4,7 @@ import os
 import signal
 from typing import Protocol, runtime_checkable
 
+from conet.control.approvals import ApprovalWorkflow
 from conet.control.policy import PolicyEngine
 from conet.control.registry import Registry
 from conet.persistence.store import Store
@@ -77,9 +78,19 @@ async def start(
     nats_url: str | None = None,
     policy_secret: str | None = None,
     policy_path: str | None = None,
+    approvers: list[str] | None = None,
+    approval_ttl_seconds: int = 3600,
+    approval_poll_interval_seconds: float = 1.0,
 ) -> RunningAgent:
     """Registers the agent, starts lease renewal, and starts the SkillServer.
-    Returns a handle the caller must eventually .stop()."""
+    Returns a handle the caller must eventually .stop().
+
+    Pass approvers (e.g. ["finance-manager@example.com"]) to gate every
+    unsafe_write Skill this agent serves behind the human approval queue
+    (F7) before invoke() runs — nothing else about the adapter needs to
+    change. Omit it and unsafe_write Skills execute immediately, exactly as
+    before.
+    """
     manifest = adapter.describe()
 
     store = Store(_resolve(db_path, 'CONET_DB_PATH', 'conet.db'))
@@ -89,10 +100,15 @@ async def start(
         policy_path=policy_path or os.environ.get('CONET_POLICY_PATH'),
     )
     registry = Registry(store, event_bus)
+    approvals = ApprovalWorkflow(store) if approvers else None
 
     agent_id = await registry.register_agent(manifest)
     renew_task = asyncio.create_task(_renew_loop(registry, agent_id, manifest.lease_ttl_seconds / 2))
-    grpc_server = await serve(manifest, adapter, policy_engine, port=_endpoint_port(manifest.endpoint), store=store)
+    grpc_server = await serve(
+        manifest, adapter, policy_engine, port=_endpoint_port(manifest.endpoint), store=store,
+        approvals=approvals, approvers=approvers,
+        approval_ttl_seconds=approval_ttl_seconds, approval_poll_interval_seconds=approval_poll_interval_seconds,
+    )
 
     return RunningAgent(agent_id, store, event_bus, registry, grpc_server, renew_task)
 
