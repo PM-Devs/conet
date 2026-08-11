@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<h1>Approvals queue</h1>
+<p class="muted">{{ approvals|length }} pending. {% if not can_decide %}Read-only — requires the Approver, Admin, or Owner role.{% endif %}</p>
+<table>
+  <tr><th>Approval</th><th>Task</th><th>Approvers</th><th>Expires</th>{% if can_decide %}<th>Decision</th>{% endif %}</tr>
+  {% for a in approvals %}
+  <tr>
+    <td>{{ a.approval_id[:8] }}</td>
+    <td>{{ a.task_id }}</td>
+    <td>{{ a.approvers|join(", ") }}</td>
+    <td>{{ a.expires_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    {% if can_decide %}
+    <td>
+      <form class="inline" method="post" action="/dashboard/approvals/{{ a.approval_id }}/approve">
+        <button type="submit">approve</button>
+      </form>
+      <form class="inline" method="post" action="/dashboard/approvals/{{ a.approval_id }}/reject">
+        <button type="submit">reject</button>
+      </form>
+    </td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">Nothing pending.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

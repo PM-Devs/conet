@@ -219,3 +219,9 @@ __marimo__/
 
 # Source docx specs (converted into docs/*.md; kept locally as originals)
 *.docx
+
+# CoNET runtime artifacts from local dev/testing (Store/auth SQLite files, MLflow tracking)
+conet.db
+conet_users.db
+mlflow.db
+mlruns/

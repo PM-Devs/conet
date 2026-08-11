@@ -1,0 +1,16 @@
+p, Owner, manage_policy
+p, Owner, manage_team
+p, Owner, approve_task
+p, Owner, view_audit
+p, Owner, manage_integrations
+p, Admin, manage_policy
+p, Admin, manage_team
+p, Admin, approve_task
+p, Admin, view_audit
+p, Admin, manage_integrations
+p, Operator, view_audit
+p, Operator, manage_integrations
+p, Approver, approve_task
+p, Approver, view_audit
+p, Auditor, view_audit
+p, Viewer, view_audit

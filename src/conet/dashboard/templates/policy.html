@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Policy editor{% endblock %}
+{% block content %}
+<h1>Policy editor</h1>
+<p class="muted">Agent RBAC rules (deny-by-default). {% if not can_manage %}Read-only — requires the Admin or Owner role.{% endif %}</p>
+
+<table>
+  <tr><th>Department</th><th>Skill</th><th>Action</th>{% if can_manage %}<th>Manage</th>{% endif %}</tr>
+  {% for rule in rules %}
+  <tr>
+    <td>{{ rule[0] }}</td><td>{{ rule[1] }}</td><td>{{ rule[2] }}</td>
+    {% if can_manage %}
+    <td>
+      <form class="inline" method="post" action="/dashboard/policy/remove">
+        <input type="hidden" name="subject" value="{{ rule[0] }}">
+        <input type="hidden" name="skill_id" value="{{ rule[1] }}">
+        <input type="hidden" name="action" value="{{ rule[2] }}">
+        <button type="submit">remove</button>
+      </form>
+    </td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">No policy rules loaded.</td></tr>
+  {% endfor %}
+</table>
+
+{% if can_manage %}
+<div class="card">
+  <strong>Add rule</strong>
+  <form method="post" action="/dashboard/policy/add">
+    <input name="subject" placeholder="department" required>
+    <input name="skill_id" placeholder="skill_id" required>
+    <input name="action" placeholder="action" value="invoke" required>
+    <button type="submit">add</button>
+  </form>
+</div>
+{% endif %}
+
+<h2>Explain a decision</h2>
+<form method="get" action="/dashboard/policy/explain">
+  <input name="subject" placeholder="department" value="{{ explain_subject or '' }}" required>
+  <input name="skill_id" placeholder="skill_id" value="{{ explain_skill_id or '' }}" required>
+  <input name="action" placeholder="action" value="{{ explain_action or 'invoke' }}" required>
+  <button type="submit">explain</button>
+</form>
+{% if explanation %}<p><strong>{{ explanation }}</strong></p>{% endif %}
+{% endblock %}

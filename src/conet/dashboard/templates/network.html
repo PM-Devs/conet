@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Network map{% endblock %}
+{% block content %}
+<h1>Network map</h1>
+<p class="muted">{{ agents|length }} active agent(s).</p>
+<table>
+  <tr><th>Agent</th><th>Department</th><th>Framework</th><th>Endpoint</th><th>Skills</th></tr>
+  {% for agent in agents %}
+  <tr>
+    <td>{{ agent.name }}</td>
+    <td>{{ agent.department }}</td>
+    <td>{{ agent.framework }}</td>
+    <td>{{ agent.endpoint }}</td>
+    <td>{% for s in agent.skills %}{{ s.skill_id }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">No agents registered.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

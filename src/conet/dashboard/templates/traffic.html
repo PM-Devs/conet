@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Live traffic{% endblock %}
+{% block content %}
+<h1>Live traffic</h1>
+<p class="muted">Most recent {{ tasks|length }} task(s). Click a task_id to see its full trace on the Audit log panel.</p>
+<table>
+  <tr><th>Task</th><th>Requester</th><th>Provider</th><th>Skill</th><th>State</th><th>Trace</th></tr>
+  {% for task in tasks %}
+  <tr>
+    <td>{{ task.task_id[:8] }}</td>
+    <td>{{ task.requester }}</td>
+    <td>{{ task.provider or "-" }}</td>
+    <td>{{ task.skill_id }}</td>
+    <td>{{ task.state }}</td>
+    <td>{% if task.trace_id %}<a href="/dashboard/audit?trace_id={{ task.trace_id }}">{{ task.trace_id[:8] }}</a>{% else %}-{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">No tasks recorded yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

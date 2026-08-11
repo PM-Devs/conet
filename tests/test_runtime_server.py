@@ -4,6 +4,7 @@ import os
 import grpc
 import pytest
 from google.protobuf.struct_pb2 import Struct
+from grpc_health.v1 import health_pb2, health_pb2_grpc
 
 from conet.control.policy import PolicyEngine
 from conet.persistence.store import Store
@@ -146,6 +147,20 @@ async def test_cancel_stops_a_running_task(running_server, policy, adapter):
 async def test_cancel_unknown_task_is_not_acknowledged(running_server):
     ack = await running_server.Cancel(pb2.CancelRequest(task_id='does-not-exist'))
     assert ack.acknowledged is False
+
+
+async def test_serve_exposes_grpc_health_checking(running_server):
+    # running_server is a SkillRuntimeStub; open a second stub on the same
+    # channel's target for the standard grpc.health.v1.Health service.
+    channel = grpc.aio.insecure_channel('localhost:50161')
+    try:
+        health_stub = health_pb2_grpc.HealthStub(channel)
+        overall = await health_stub.Check(health_pb2.HealthCheckRequest(service=''))
+        assert overall.status == health_pb2.HealthCheckResponse.SERVING
+        skill_runtime = await health_stub.Check(health_pb2.HealthCheckRequest(service='conet.runtime.SkillRuntime'))
+        assert skill_runtime.status == health_pb2.HealthCheckResponse.SERVING
+    finally:
+        await channel.close()
 
 
 async def test_execute_persists_a_completed_task_when_store_is_given(tmp_path, policy, adapter):

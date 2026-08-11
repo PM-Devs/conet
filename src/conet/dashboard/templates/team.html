@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Team &amp; accounts{% endblock %}
+{% block content %}
+<h1>Team &amp; accounts</h1>
+<p class="muted">Human roles gate dashboard actions — separate from agent RBAC. {% if not can_manage %}Read-only — requires the Admin or Owner role.{% endif %}</p>
+
+<table>
+  <tr><th>Email</th><th>Role</th><th>Superuser</th>{% if can_manage %}<th>Assign role</th>{% endif %}</tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.email }}</td>
+    <td>{{ roles.get(u.id|string, "(none)") }}</td>
+    <td>{{ "yes" if u.is_superuser else "no" }}</td>
+    {% if can_manage %}
+    <td>
+      <form class="inline" method="post" action="/dashboard/team/assign">
+        <input type="hidden" name="user_id" value="{{ u.id }}">
+        <select name="role">
+          {% for r in valid_roles %}
+          <option value="{{ r }}" {{ "selected" if roles.get(u.id|string) == r else "" }}>{{ r }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">assign</button>
+      </form>
+    </td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">No accounts yet.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Invite a teammate</h2>
+<p class="muted">Creates the account directly (no SMTP wired up yet) — share the generated password with them out of band.</p>
+<form method="post" action="/dashboard/team/invite">
+  <input name="email" type="email" placeholder="email" required>
+  <select name="role">
+    {% for r in valid_roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+  </select>
+  <button type="submit">invite</button>
+</form>
+{% if invited_password %}
+<p class="card">Account created for <strong>{{ invited_email }}</strong>. Temporary password: <code>{{ invited_password }}</code></p>
+{% endif %}
+{% endblock %}

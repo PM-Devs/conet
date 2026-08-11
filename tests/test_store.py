@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from conet.persistence.store import Store
-from conet.sdk.manifests import AgentManifest, AuditEvent, SkillDef, Task
+from conet.sdk.manifests import AgentManifest, Approval, AuditEvent, SkillDef, Task
 
 
 def make_manifest(name: str, skill_id: str = 'invoice.verify', ttl: int = 30) -> AgentManifest:
@@ -112,6 +113,24 @@ async def test_get_task_returns_none_for_unknown_task(store):
     assert await store.get_task('does-not-exist') is None
 
 
+async def test_list_recent_tasks_orders_newest_first(store):
+    import asyncio
+    t1 = Task(task_id='t1', requester='agent-a', skill_id='invoice.verify')
+    await store.save_task(t1)
+    await asyncio.sleep(0.01)
+    t2 = Task(task_id='t2', requester='agent-a', skill_id='invoice.verify')
+    await store.save_task(t2)
+    tasks = await store.list_recent_tasks()
+    assert [t.task_id for t in tasks] == ['t2', 't1']
+
+
+async def test_list_recent_tasks_respects_limit(store):
+    for i in range(5):
+        await store.save_task(Task(task_id=f't{i}', requester='agent-a', skill_id='invoice.verify'))
+    tasks = await store.list_recent_tasks(limit=2)
+    assert len(tasks) == 2
+
+
 async def test_list_all_agents_returns_only_active(store):
     await store.upsert_agent(make_manifest('agent-a'))
     await store.upsert_agent(make_manifest('agent-b', ttl=-10))
@@ -140,3 +159,40 @@ async def test_list_audit_events_filters_by_trace_id(store):
     await store.append_audit(other)
     events = await store.list_audit_events(trace_id='trace-1')
     assert [e.event_id for e in events] == [matching.event_id]
+
+
+def make_approval(task_id: str = 'task-1', **overrides) -> Approval:
+    defaults = {'task_id': task_id, 'expires_at': datetime.now(timezone.utc) + timedelta(minutes=30)}
+    defaults.update(overrides)
+    return Approval(**defaults)
+
+
+async def test_save_and_get_approval_roundtrip(store):
+    approval = make_approval(approvers=['alice'])
+    await store.save_approval(approval)
+    fetched = await store.get_approval(approval.approval_id)
+    assert fetched is not None
+    assert fetched.approvers == ['alice']
+    assert fetched.state == 'PENDING'
+
+
+async def test_get_approval_returns_none_for_unknown(store):
+    assert await store.get_approval('does-not-exist') is None
+
+
+async def test_save_approval_updates_state(store):
+    approval = make_approval()
+    await store.save_approval(approval)
+    approval.state = 'APPROVED'
+    await store.save_approval(approval)
+    fetched = await store.get_approval(approval.approval_id)
+    assert fetched.state == 'APPROVED'
+
+
+async def test_list_pending_approvals_excludes_decided_ones(store):
+    pending = make_approval(task_id='task-pending')
+    approved = make_approval(task_id='task-approved', state='APPROVED')
+    await store.save_approval(pending)
+    await store.save_approval(approved)
+    results = await store.list_pending_approvals()
+    assert [a.approval_id for a in results] == [pending.approval_id]

@@ -4,6 +4,7 @@ from typing import Protocol, runtime_checkable
 
 import grpc
 from google.protobuf.struct_pb2 import Struct
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 from conet.control.policy import PolicyEngine
 from conet.observability.tracing import audit
@@ -180,11 +181,23 @@ class SkillServer(pb2_grpc.SkillRuntimeServicer):
         return pb2.CancelAck(acknowledged=True)
 
 
+_HEALTH_SERVICE_NAME = 'conet.runtime.SkillRuntime'
+
+
 async def serve(
     manifest: AgentManifest, adapter: SkillAdapter, policy_engine: PolicyEngine, port: int, store: Store | None = None,
 ) -> grpc.aio.Server:
     server = grpc.aio.server()
     pb2_grpc.add_SkillRuntimeServicer_to_server(SkillServer(manifest, adapter, policy_engine, store), server)
+
+    # F8 (health & lifecycle): standard gRPC health checking (proven in Stage A's
+    # A2 prototype), so the runtime — and a future Router/F5 — can tell a live
+    # provider from an unhealthy one (FR-019), not just a lease-alive one.
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    health_servicer.set(_HEALTH_SERVICE_NAME, health_pb2.HealthCheckResponse.SERVING)
+    health_servicer.set('', health_pb2.HealthCheckResponse.SERVING)  # overall server health
+
     server.add_insecure_port(f'[::]:{port}')
     await server.start()
     return server

@@ -3,7 +3,7 @@ import time
 
 import aiosqlite
 
-from conet.sdk.manifests import AgentManifest, AuditEvent, Task
+from conet.sdk.manifests import AgentManifest, Approval, AuditEvent, Task
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS audit (
     event_json TEXT NOT NULL,
     timestamp REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS approvals (
+    approval_id TEXT PRIMARY KEY,
+    approval_json TEXT NOT NULL,
+    state TEXT NOT NULL,
+    expires_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_state ON approvals(state);
 """
 
 
@@ -152,6 +160,20 @@ class Store:
             logger.exception('get_task failed for %s', task_id)
             raise
 
+    async def list_recent_tasks(self, limit: int = 50) -> list[Task]:
+        """Not part of B1's original 5-method contract; added for the
+        dashboard's Live Traffic panel."""
+        try:
+            db = await self._connection()
+            async with db.execute(
+                'SELECT task_json FROM tasks ORDER BY updated_at DESC LIMIT ?', (limit,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+            return [Task.model_validate_json(row[0]) for row in rows]
+        except Exception:
+            logger.exception('list_recent_tasks failed')
+            raise
+
     async def append_audit(self, event: AuditEvent) -> None:
         try:
             db = await self._connection()
@@ -182,6 +204,48 @@ class Store:
             return [AuditEvent.model_validate_json(row[0]) for row in rows]
         except Exception:
             logger.exception('list_audit_events failed')
+            raise
+
+    async def save_approval(self, approval: Approval) -> None:
+        """Not part of B1's original 5-method contract; added for F7 (human
+        approval workflow) and the dashboard's Approvals queue panel."""
+        try:
+            db = await self._connection()
+            await db.execute(
+                """INSERT INTO approvals (approval_id, approval_json, state, expires_at) VALUES (?, ?, ?, ?)
+                   ON CONFLICT(approval_id) DO UPDATE SET
+                       approval_json = excluded.approval_json,
+                       state = excluded.state,
+                       expires_at = excluded.expires_at""",
+                (approval.approval_id, approval.model_dump_json(), approval.state, approval.expires_at.timestamp()),
+            )
+            await db.commit()
+        except Exception:
+            logger.exception('save_approval failed for %s', approval.approval_id)
+            raise
+
+    async def get_approval(self, approval_id: str) -> Approval | None:
+        try:
+            db = await self._connection()
+            async with db.execute(
+                'SELECT approval_json FROM approvals WHERE approval_id = ?', (approval_id,),
+            ) as cursor:
+                row = await cursor.fetchone()
+            return Approval.model_validate_json(row[0]) if row else None
+        except Exception:
+            logger.exception('get_approval failed for %s', approval_id)
+            raise
+
+    async def list_pending_approvals(self) -> list[Approval]:
+        try:
+            db = await self._connection()
+            async with db.execute(
+                "SELECT approval_json FROM approvals WHERE state = 'PENDING' ORDER BY expires_at",
+            ) as cursor:
+                rows = await cursor.fetchall()
+            return [Approval.model_validate_json(row[0]) for row in rows]
+        except Exception:
+            logger.exception('list_pending_approvals failed')
             raise
 
     async def is_agent_active(self, agent_id: str) -> bool:

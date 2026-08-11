@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CoNET — Sign in</title>
+  <style>
+    body { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    form { display: flex; flex-direction: column; gap: .6rem; width: 260px; }
+    .error { color: #c33; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/dashboard/login">
+    <h2>CoNET</h2>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <input name="email" type="email" placeholder="email" required autofocus>
+    <input name="password" type="password" placeholder="password" required>
+    <button type="submit">sign in</button>
+    <a href="/dashboard/register">first time? create the owner account</a>
+  </form>
+</body>
+</html>

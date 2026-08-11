@@ -79,3 +79,17 @@ class AuditEvent(BaseModel):
     timestamp: datetime = Field(default_factory=_utcnow)
     trace_id: str | None = None
     metadata: dict[str, Any] = {}
+
+
+ApprovalState = Literal['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED']
+
+
+class Approval(BaseModel):
+    approval_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str
+    policy_id: str | None = None
+    approvers: list[str] = []
+    state: ApprovalState = 'PENDING'
+    expires_at: datetime
+    decision_metadata: dict[str, Any] = {}
+    created_at: datetime = Field(default_factory=_utcnow)

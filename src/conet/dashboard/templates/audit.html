@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+<form hx-get="/dashboard/audit" hx-target="#audit-table" hx-swap="outerHTML" hx-push-url="true">
+  <input name="trace_id" placeholder="filter by trace_id" value="{{ trace_id or '' }}">
+  <button type="submit">search</button>
+  <a href="/dashboard/audit">clear</a>
+</form>
+<table id="audit-table">
+  <tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Outcome</th><th>Trace</th></tr>
+  {% for e in events %}
+  <tr>
+    <td>{{ e.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+    <td>{{ e.actor }}</td>
+    <td>{{ e.action }}</td>
+    <td>{{ e.resource }}</td>
+    <td class="status-{{ e.outcome|lower }}">{{ e.outcome }}</td>
+    <td>{% if e.trace_id %}<a href="/dashboard/audit?trace_id={{ e.trace_id }}">{{ e.trace_id[:8] }}</a>{% else %}-{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">No audit records{% if trace_id %} for trace_id={{ trace_id }}{% endif %}.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

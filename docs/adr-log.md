@@ -59,6 +59,16 @@ While building the SRS §10 acceptance flow, `B5 SkillServer.Execute`/`ExecuteSt
 
 Also added: `Discovery.find_skill` now writes an audit record when it excludes a candidate for lack of authorization (FR-022 — denials are security-significant and must be audited; this wasn't happening before).
 
+## ADR-016 (new) — grpcio family and protobuf must be pinned together, narrowly
+
+Installing `mlflow` (F13's optional `eval` extra) pulled in `databricks-sdk`, which caps `protobuf<7.0` (with several 5.x/6.x point releases excluded). That silently downgraded the environment's `protobuf` package — but `grpcio-tools`' `protoc` embeds a *fixed* gencode target per release (1.83.0 always targets protobuf gencode 7.35.1, regardless of what `protobuf` package is separately installed), and protobuf's runtime check requires `runtime >= gencode`. The result: every `*_pb2.py` file generated with grpcio-tools 1.83.0 refused to import once mlflow's install downgraded the runtime below 7.35.1 — `google.protobuf.runtime_version.VersionError`.
+
+This is a real footgun: installing an *optional* extra broke the *core* gRPC data plane, silently, with no signal until something tried to import a generated stub.
+
+**Fix**: pin the whole `grpcio`/`grpcio-tools`/`grpcio-health-checking`/`grpcio-status` family to the same narrow range (`>=1.71,<1.72`) together with `protobuf>=5.29.6,<6.0` — a combination verified compatible with both grpcio-tools 1.71.0's gencode target *and* databricks-sdk's ceiling. The `skillruntime_pb2*.py` files were regenerated against this combination (`python -m grpc_tools.protoc ...` — see `src/conet/protocols/grpc/skillruntime.proto`); remember to reapply the `from . import skillruntime_pb2 as skillruntime__pb2` relative-import fix in `skillruntime_pb2_grpc.py` after any regeneration (grpc_tools.protoc always emits a bare `import`, which breaks once the generated files live inside a package rather than a flat script directory).
+
+If `conet[eval]` (mlflow) is ever dropped, or a way to isolate its dependency graph from the core install is found, these caps can likely be relaxed again — check whether `databricks-sdk`'s protobuf ceiling has moved before doing so.
+
 ---
 
 Not covered by a Stage A prototype (left as-is from the Architecture plan, still open): ADR-002 (identity/mTLS), ADR-004/005/007/008/009/011/012/013/014. These are owned by later stages/LLDs, not blockers for the Stage B vertical slice.

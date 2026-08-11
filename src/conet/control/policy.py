@@ -23,6 +23,7 @@ class PolicyEngine:
     def __init__(self, secret_key: str, policy_path: str | None = None) -> None:
         self._secret_key = secret_key
         self._enforcer = casbin.Enforcer(_MODEL_PATH, policy_path) if policy_path else casbin.Enforcer(_MODEL_PATH)
+        self._enforcer.enable_auto_save(True)  # dashboard Policy editor writes persist back to policy_path
 
     async def authorize(self, subject: str, skill_id: str, action: str) -> bool:
         try:
@@ -51,3 +52,16 @@ class PolicyEngine:
             return jwt.decode(token, self._secret_key, algorithms=[_ALGORITHM])
         except JWTError:
             return None
+
+    def list_policy_rules(self) -> list[tuple[str, str, str]]:
+        """Not part of B6's original 4-method contract; added for the
+        dashboard's Policy editor panel."""
+        return [tuple(rule) for rule in self._enforcer.get_policy()]
+
+    def add_policy_rule(self, subject: str, skill_id: str, action: str) -> bool:
+        """Returns False if the rule already existed."""
+        return self._enforcer.add_policy(subject, skill_id, action)
+
+    def remove_policy_rule(self, subject: str, skill_id: str, action: str) -> bool:
+        """Returns False if no such rule existed."""
+        return self._enforcer.remove_policy(subject, skill_id, action)

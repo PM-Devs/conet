@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Integrations{% endblock %}
+{% block content %}
+<h1>Integrations</h1>
+<p class="muted">External MCP servers connected through the managed gateway. Credentials are used only for the connection itself — they are never shown or stored anywhere else.</p>
+
+<table>
+  <tr><th>Server</th><th>Imported skills</th>{% if can_manage %}<th>Manage</th>{% endif %}</tr>
+  {% for name, skill_ids in servers.items() %}
+  <tr>
+    <td>{{ name }}</td>
+    <td>{{ skill_ids|join(", ") if skill_ids else "(not imported yet)" }}</td>
+    {% if can_manage %}
+    <td>
+      <form method="post" action="/dashboard/integrations/disconnect">
+        <input type="hidden" name="server_name" value="{{ name }}">
+        <button type="submit">disconnect</button>
+      </form>
+    </td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">No servers connected.</td></tr>
+  {% endfor %}
+</table>
+
+{% if can_manage %}
+<div class="card">
+  <strong>Connect a server</strong>
+  <form method="post" action="/dashboard/integrations/connect">
+    <input name="server_name" placeholder="server name" required><br><br>
+    <input name="command" placeholder="command (e.g. python)" required><br><br>
+    <input name="args" placeholder="args, space-separated"><br><br>
+    <input name="env" placeholder="ENV_VAR=value, comma-separated"><br><br>
+    <button type="submit">connect &amp; import capabilities</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CoNET — Create account</title>
+  <style>
+    body { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    form { display: flex; flex-direction: column; gap: .6rem; width: 260px; }
+    .error { color: #c33; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/dashboard/register">
+    <h2>Create account</h2>
+    <p class="muted">The first account created becomes the network's Owner/admin automatically.</p>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <input name="email" type="email" placeholder="email" required autofocus>
+    <input name="password" type="password" placeholder="password" required>
+    <button type="submit">create account</button>
+    <a href="/dashboard/login">already have an account? sign in</a>
+  </form>
+</body>
+</html>
