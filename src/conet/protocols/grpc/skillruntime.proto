@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package conet.runtime;
+
+import "google/protobuf/struct.proto";
+
+service SkillRuntime {
+  rpc Execute (SkillRequest) returns (SkillResponse);
+  rpc ExecuteStream (SkillRequest) returns (stream SkillChunk);
+  rpc Cancel (CancelRequest) returns (CancelAck);
+}
+
+enum Status {
+  OK = 0;
+  DENIED = 1;
+  FAILED = 2;
+  TIMED_OUT = 3;
+  CANCELLED = 4;
+}
+
+message SkillRequest {
+  string skill_id = 1;
+  string task_id = 2;              // control-plane issued
+  string trace_id = 3;             // OpenTelemetry context
+  string auth_context = 4;         // signed, short-TTL token from control plane
+  string idempotency_key = 5;      // present iff Skill requires it
+  int64 deadline_unix_ms = 6;
+  google.protobuf.Struct input = 7; // shape governed by input_schema
+}
+
+message SkillResponse {
+  Status status = 1;
+  google.protobuf.Struct output = 2; // shape governed by output_schema
+  string error_detail = 3;
+}
+
+message SkillChunk {
+  int32 seq = 1;
+  google.protobuf.Struct data = 2;
+}
+
+message CancelRequest {
+  string task_id = 1;
+}
+
+message CancelAck {
+  bool acknowledged = 1;
+}

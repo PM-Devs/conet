@@ -42,24 +42,27 @@ dependencies = [
     "pydantic>=2.6,<3.0",
     "pydantic-settings>=2.2,<3.0",
     "python-multipart>=0.0.9",          # form parsing for the dashboard
+    "jsonschema>=4.20,<5.0",            # SkillDef.validate_input / validate_output
 
     # Internal data plane (Skill execution)
     "grpcio>=1.62,<2.0",
     "grpcio-tools>=1.62,<2.0",
     "grpcio-health-checking>=1.62,<2.0",
-    "protobuf>=4.25,<6.0",
+    "protobuf>=4.25,<8.0",
 
     # Event plane
     "nats-py>=2.7,<3.0",
 
-    # Persistence (async MongoDB via the modern PyMongo async API)
-    "pymongo>=4.9,<5.0",
+    # Persistence — SQLite via aiosqlite, so the control plane needs no
+    # external database service (see docs/adr-log.md). Swap for a
+    # horizontally-scalable backend when Stage C needs multi-node.
+    "aiosqlite>=0.20,<1.0",
 
     # Agent policy (deny-by-default RBAC)
     "casbin>=1.36,<2.0",
 
     # Human auth & teams (self-hosted; no third-party auth SaaS)
-    "fastapi-users[beanie]>=13.0,<14.0",
+    "fastapi-users[sqlalchemy]>=13.0,<14.0",
     "passlib[bcrypt]>=1.7.4,<2.0",
     "python-jose[cryptography]>=3.3,<4.0",
 
@@ -110,15 +113,20 @@ conet = "conet.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+conet = ["control/*.conf", "dashboard/templates/*"]
+
 # --- Tooling config kept in one place ---------------------------------------
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi"]  # grpc_tools.protoc output; not hand-maintained
 
 [tool.mypy]
 python_version = "3.10"
 warn_unused_ignores = true
 ignore_missing_imports = true
+exclude = ["_pb2\\.pyi$", "_pb2\\.py$", "_pb2_grpc\\.py$"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
