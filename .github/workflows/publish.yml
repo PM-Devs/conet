@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/conet/
+      url: https://pypi.org/project/colonynet/
     permissions:
       id-token: write  # mandatory for Trusted Publishing -- do not remove
     steps:

@@ -7,7 +7,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "conet"
+name = "colonynet"
 version = "0.1.0"
 description = "An open-source orchestration and governance layer for private, distributed AI-agent networks."
 readme = "README.md"
@@ -82,7 +82,7 @@ dependencies = [
     "opentelemetry-instrumentation-grpc>=0.45b0",
 ]
 
-# --- Optional dependency groups (opt in with  pip install conet[group] ) -----
+# --- Optional dependency groups (opt in with  pip install colonynet[group] ) -----
 [project.optional-dependencies]
 
 # External tool boundary — needed only when running the MCP gateway (Stage D).
