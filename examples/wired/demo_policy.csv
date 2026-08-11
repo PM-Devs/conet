@@ -1,0 +1,3 @@
+p, orchestrator, support.triage_ticket, invoke
+p, orchestrator, finance.get_balance, invoke
+p, orchestrator, inventory.check_stock, invoke
