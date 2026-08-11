@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Source docx specs (converted into docs/*.md; kept locally as originals)
+*.docx

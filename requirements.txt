@@ -1,0 +1,4 @@
+# Dependencies are managed in pyproject.toml.
+# Install for local development with:
+#   pip install -e ".[dev]"
+-e .[dev]
