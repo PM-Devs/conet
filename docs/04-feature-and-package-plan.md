@@ -308,7 +308,3 @@ F12 MCP gateway full. A2A edge adapter is post-v1, behind the LLD-01 adapter bou
 **The proof that ties it together:**  wire your own CrewAI and LangGraph agents through F1–F11 as the launch demo. Two agents, two frameworks, discovering and calling each other under one governance layer, watched live in the dashboard — that is the thing nobody else is showing, and it is your LinkedIn/GitHub headline.
 
 *Document 4 of the CoNET set. Companions: Project Overview; SRS; Architecture & Implementation Plan; LLD-01 Manifest & Adapter. Package choices are provisional starting points — confirm each in its Stage-A spike. Verify fast-moving SDKs (MCP, A2A, MLflow) against current docs before pinning versions.*
-
----
-
-*Document 4 — Feature-by-Feature Build & Package Plan — part of the CoNET specification set.*

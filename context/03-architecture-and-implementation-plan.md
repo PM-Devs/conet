@@ -1,42 +1,22 @@
-# CoNET — Document 3 of 3 — Architecture & Implementation Plan
+# CoNET — Architecture & Implementation Plan
 
-*Research first, record decisions, then implement a narrow v0.1*
+**Document 3 of the CoNET specification set.**
 
-> How CoNET is built: topology, research spikes, architecture decisions, the four-stage plan, technology baseline, and benchmarks. Requirements are in the SRS; buildable detail is in the LLDs.
-
-**Consistent doc set · v0.1 scope · Draft, 10 August 2026**
-
-## Contents
-
-- [1. Why research precedes implementation](#1-why-research-precedes-implementation)
-- [2. Reference topology](#2-reference-topology)
-- [3. Research workstreams](#3-research-workstreams)
-- [4. Architecture decisions before v0.1](#4-architecture-decisions-before-v01)
-- [5. Technology baseline (provisional)](#5-technology-baseline-provisional)
-- [6. Four-stage build plan](#6-four-stage-build-plan)
-  - [Stage A — Architecture laboratory (throwaway prototypes)](#stage-a-architecture-laboratory-throwaway-prototypes)
-  - [Stage B — v0.1 vertical slice](#stage-b-v01-vertical-slice)
-  - [Stage C — Enterprise control](#stage-c-enterprise-control)
-  - [Stage D — Managed external boundary](#stage-d-managed-external-boundary)
-- [7. Research checklist by feature](#7-research-checklist-by-feature)
-- [8. Benchmark plan](#8-benchmark-plan)
-- [9. Target repository layout (after ADRs stabilize)](#9-target-repository-layout-after-adrs-stabilize)
-- [10. Definition of ready to implement](#10-definition-of-ready-to-implement)
-- [11. Reference sources](#11-reference-sources)
-    - [Positioning (verify before committing dependent architecture)](#positioning-verify-before-committing-dependent-architecture)
-    - [Implementation references](#implementation-references)
+*How CoNET is built: topology, research spikes, architecture decisions, the four-stage plan, technology baseline, and benchmarks. Requirements are in the SRS; buildable detail is in the LLDs.*
 
 ---
 
 ## 1. Why research precedes implementation
 
-**The governing rule:**  the main risk is not writing code too slowly — it is freezing the wrong contracts too early.
+> **The governing rule:** the main risk is not writing code too slowly — it is freezing the wrong contracts too early.
 
 Registration, discovery, identity, authorization, task semantics, and cancellation all become foundational APIs. The plan therefore begins with short research spikes and Architecture Decision Records (ADRs), followed by a small vertical prototype. The manifest and adapter contracts (the most-depended-on of these) are already specified in LLD-01.
 
+---
+
 ## 2. Reference topology
 
-```text
+```
 Organization (CoNET network)
 ├── Branch / Department A
 │     ├── Agent A1
@@ -51,6 +31,8 @@ Organization (CoNET network)
       ├── Policy / Permissions   └── MCP Gateway
       └── Router / Runtime
 ```
+
+---
 
 ## 3. Research workstreams
 
@@ -73,15 +55,17 @@ Each spike produces a decision artifact (an ADR or a versioned contract). Spikes
 | R13 — Persistence | What must be durable? | MongoDB collections/indexes, optimistic concurrency, audit storage, task history. | Persistence schema v0.1. |
 | R14 — Admin UX | What needs immediate operator control? | Agent topology, Skills, tasks, approvals, disable/drain, audit, MCP integrations. | Dashboard information architecture. |
 
+---
+
 ## 4. Architecture decisions before v0.1
 
 Fourteen decisions must be recorded before the vertical slice. Two are already committed (shown resolved); the rest are open and owned by their spike.
 
 | ADR | Decision | Status / direction |
 |---|---|---|
-| ADR-001 | One control plane per organization, or multi-tenant? | RESOLVED — single-org, single-trust-domain for v0.1. |
+| ADR-001 | One control plane per organization, or multi-tenant? | **RESOLVED** — single-org, single-trust-domain for v0.1. |
 | ADR-002 | Canonical agent identity and how it is authenticated? | Leaning mTLS per agent, single internal CA (R1). |
-| ADR-003 | Mandatory fields in AgentManifest and SkillManifest? | RESOLVED — specified in LLD-01. |
+| ADR-003 | Mandatory fields in AgentManifest and SkillManifest? | **RESOLVED** — specified in LLD-01. |
 | ADR-004 | Registry writes via HTTP/gRPC, events, or both? | Open (R2, R8). |
 | ADR-005 | Source of truth for live health: lease, gRPC health, NATS heartbeat, or combination? | Open (R2, R7, R8). |
 | ADR-006 | Which policy model, and the default-deny rule? | Leaning deny-by-default RBAC via Casbin (R5). |
@@ -94,7 +78,9 @@ Fourteen decisions must be recorded before the vertical slice. Two are already c
 | ADR-013 | How are MCP secrets isolated from agents and logs? | Gateway-only secret store, by reference (R12). |
 | ADR-014 | What information is allowed in AI activity logs? | Data-minimized by default (R11, NFR-012). |
 
-**Recommended practice:**  keep each ADR as its own one-page record (context → options → decision → consequences) in the repo, updated as its spike closes. The status column above is the running index.
+> **Recommended practice:** keep each ADR as its own one-page record (context → options → decision → consequences) in the repo, updated as its spike closes. The status column above is the running index.
+
+---
 
 ## 5. Technology baseline (provisional)
 
@@ -114,10 +100,11 @@ Starting hypotheses, not irreversible decisions. Confirm each in its spike.
 | Official MCP SDK | Managed MCP gateway | Do not implement MCP wire behavior from scratch. |
 | A2A SDK (later) | Candidate external/edge adapter | Adopt for external agent-to-agent delegation rather than reimplementing. |
 
+---
+
 ## 6. Four-stage build plan
 
 ### Stage A — Architecture laboratory (throwaway prototypes)
-
 Goal: answer foundational questions before committing package APIs.
 
 - Prototype AgentManifest and SkillManifest with Pydantic (against LLD-01).
@@ -131,7 +118,6 @@ Goal: answer foundational questions before committing package APIs.
 **Exit criteria:** all ADRs required for the v0.1 slice are decided, with evidence from experiments.
 
 ### Stage B — v0.1 vertical slice
-
 Goal: prove the idea end to end with the smallest useful network.
 
 - CoNET control service with MongoDB persistence.
@@ -145,10 +131,9 @@ Goal: prove the idea end to end with the smallest useful network.
 - Minimal append-only audit event.
 - CLI for network status, agent listing, task cancellation.
 
-**Demonstration:** Agent A discovers math.add from Agent B and executes it without knowing B's endpoint beforehand — the SRS §10 acceptance test passes.
+**Demonstration:** Agent A discovers `math.add` from Agent B and executes it without knowing B's endpoint beforehand — the SRS §10 acceptance test passes.
 
 ### Stage C — Enterprise control
-
 - Department / branch / network zones.
 - Full policy model with policy explanation.
 - Human-approval workflow.
@@ -159,7 +144,6 @@ Goal: prove the idea end to end with the smallest useful network.
 - Admin web dashboard.
 
 ### Stage D — Managed external boundary
-
 - Implement the logical CoNET MCP gateway.
 - Connect multiple MCP servers through the gateway.
 - Import and namespace approved MCP capabilities.
@@ -167,6 +151,8 @@ Goal: prove the idea end to end with the smallest useful network.
 - Store external credentials only in the gateway secret mechanism.
 - Trace and audit every external invocation.
 - Disconnect one MCP server without affecting internal agents or other connections.
+
+---
 
 ## 7. Research checklist by feature
 
@@ -183,6 +169,8 @@ Goal: prove the idea end to end with the smallest useful network.
 | Agent stop/drain | How is new work blocked while existing work finishes? | Drained agent accepts no new tasks while unrelated activity continues. |
 | MCP gateway | How are tool collisions, credentials, connection failures, per-agent permissions handled? | Internal agent uses an external capability without handling MCP credentials. |
 
+---
+
 ## 8. Benchmark plan
 
 **Do not choose performance targets from intuition.** Build a baseline and measure:
@@ -194,15 +182,17 @@ Goal: prove the idea end to end with the smallest useful network.
 - Cancellation propagation time.
 - Lease-expiry accuracy and registry convergence.
 - NATS event throughput and redelivery behavior.
-- MongoDB index performance for network_id + skill_id + status queries.
+- MongoDB index performance for `network_id + skill_id + status` queries.
 - Trace overhead with sampling enabled.
 - Failover time after a provider becomes unhealthy.
+
+---
 
 ## 9. Target repository layout (after ADRs stabilize)
 
 Do not create all of these on day one; this is the target separation once the ADRs settle.
 
-```text
+```
 conet/
 ├── sdk/            # manifests, registration, discovery, task client
 ├── control/        # registry, policy, approvals, admin API
@@ -217,6 +207,8 @@ conet/
 ├── cli/
 └── examples/
 ```
+
+---
 
 ## 10. Definition of ready to implement
 
@@ -234,15 +226,17 @@ Begin production implementation only when all of the following are true:
 - MCP gateway is clearly separated from internal communication.
 - At least one architecture-laboratory prototype validates the riskiest decisions.
 
+---
+
 ## 11. Reference sources
 
-#### Positioning (verify before committing dependent architecture)
+**Positioning (verify before committing dependent architecture):**
 
 - [A2A Protocol Specification](https://a2a-protocol.org/latest/specification/) — current agent-to-agent standard; discovery via Agent Cards, task lifecycle.
 - [Governance Gaps in Agent Interoperability Protocols (arXiv 2606.31498)](https://arxiv.org/abs/2606.31498v1) — governance as a missing architectural layer above MCP/A2A.
 - [MCP Official SDKs](https://modelcontextprotocol.io/docs/sdk) — for the managed gateway; do not reimplement the wire protocol.
 
-#### Implementation references
+**Implementation references:**
 
 - [gRPC Health Checking](https://grpc.io/docs/guides/health-checking/)
 - [gRPC Deadlines](https://grpc.io/docs/guides/deadlines/)
@@ -253,5 +247,3 @@ Begin production implementation only when all of the following are true:
 - [Casbin RBAC](https://www.casbin.org/docs/rbac)
 - [MLflow](https://mlflow.org/docs/latest/)
 - [PyMongo Async migration](https://www.mongodb.com/docs/languages/python/pymongo-driver/current/reference/migration/)
-
-*Document 3 of 3 in the CoNET specification set. Companion documents: Project Overview; Software Requirements Specification. Subsystem detail lives in the LLD set (LLD-01 written).*

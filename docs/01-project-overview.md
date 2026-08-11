@@ -109,7 +109,3 @@ Public/internet discovery; cross-company reputation or marketplace; billing/sett
 **Reading order:**  this Overview → SRS for the contract of what must be true → Architecture plan for how to get there → the LLD for the subsystem you are about to build. Each fact lives in one document and is referenced, not repeated, by the others.
 
 *Document 1 of 3 in the CoNET specification set. Companion documents: Software Requirements Specification; Architecture & Implementation Plan.*
-
----
-
-*Document 1 of 3 — Project Overview — part of the CoNET specification set.*

@@ -1,26 +1,8 @@
-# CoNET — Document 2 of 3 — Software Requirements Specification
+# CoNET — Software Requirements Specification (SRS)
 
-*Functional and non-functional requirements for the first private-network release*
+**Document 2 of the CoNET specification set.**
 
-> The formal contract of what CoNET v0.1 must do. Reference material — check it; do not read it as narrative. Rationale lives in the Project Overview; build detail lives in the LLDs.
-
-**Consistent doc set · v0.1 scope · Draft, 10 August 2026**
-
-## Contents
-
-- [1. Scope](#1-scope)
-- [2. Actors](#2-actors)
-- [3. Core domain objects](#3-core-domain-objects)
-- [4. Functional requirements](#4-functional-requirements)
-- [5. Non-functional requirements](#5-non-functional-requirements)
-- [6. Required state machines](#6-required-state-machines)
-    - [6.1 Agent lifecycle](#61-agent-lifecycle)
-    - [6.2 Task lifecycle](#62-task-lifecycle)
-    - [6.3 Integration lifecycle](#63-integration-lifecycle)
-- [7. Security requirements (committed v0.1 positions)](#7-security-requirements-committed-v01-positions)
-- [8. Interface requirements](#8-interface-requirements)
-- [9. Deferred requirements](#9-deferred-requirements)
-- [10. Acceptance test for v0.1](#10-acceptance-test-for-v01)
+*The formal contract of what CoNET v0.1 must do. Reference material — check it; do not read it as narrative. Rationale lives in the Project Overview; build detail lives in the LLDs.*
 
 ---
 
@@ -28,7 +10,9 @@
 
 This SRS defines functional and non-functional requirements for an initial open-source CoNET release targeting private organizational networks. Public federation and marketplace features are explicitly deferred (§9). Rationale and positioning are in Document 1 (Project Overview); this document states requirements only.
 
-**Foundational assumption (ADR-001):**  CoNET v0.1 is single-organization, single-trust-domain. All requirements below are written for one company per deployment.
+> **Foundational assumption (ADR-001):** CoNET v0.1 is single-organization, single-trust-domain. All requirements below are written for one company per deployment.
+
+---
 
 ## 2. Actors
 
@@ -40,6 +24,8 @@ This SRS defines functional and non-functional requirements for an initial open-
 | Human Approver | Authorized person who approves or rejects protected tasks. |
 | MCP Gateway | Managed CoNET service that connects external MCP servers and maps their capabilities into CoNET. |
 | Observer / Auditor | Reads traces, logs, and activity history without necessarily controlling execution. |
+
+---
 
 ## 3. Core domain objects
 
@@ -56,7 +42,9 @@ This SRS defines functional and non-functional requirements for an initial open-
 | Integration | integration_id, gateway_id, type=MCP, server_name, status, allowed_skills, secret_reference |
 | AuditEvent | event_id, actor, action, resource, outcome, timestamp, trace_id, metadata |
 
-**Contract note:**  the Skill object's input_schema/output_schema are JSON Schema (see LLD-01). Skill and Agent manifest field-level detail is specified in LLD-01, not repeated here.
+> **Contract note:** the Skill object's `input_schema`/`output_schema` are JSON Schema (see LLD-01). Skill and Agent manifest field-level detail is specified in LLD-01, not repeated here.
+
+---
 
 ## 4. Functional requirements
 
@@ -91,6 +79,8 @@ This SRS defines functional and non-functional requirements for an initial open-
 | FR-027 | Configuration history | Policy and integration configuration changes shall be auditable. |
 | FR-028 | Framework neutrality | The CoNET wire/runtime contracts shall not require agents to use a particular framework or model provider. |
 
+---
+
 ## 5. Non-functional requirements
 
 | ID | Quality | Requirement |
@@ -108,31 +98,32 @@ This SRS defines functional and non-functional requirements for an initial open-
 | NFR-011 | Open-source usability | A developer shall be able to run a minimal CoNET network locally with clear configuration and examples. |
 | NFR-012 | Data minimization | Logs and traces shall avoid retaining unnecessary prompts, secrets, or sensitive payloads by default. |
 
+---
+
 ## 6. Required state machines
 
-#### 6.1 Agent lifecycle
-
-```text
+### 6.1 Agent lifecycle
+```
 REGISTERING → ACTIVE → DRAINING → OFFLINE
             ↘ DISABLED
 ACTIVE → DEGRADED → ACTIVE / OFFLINE
 ```
 
-#### 6.2 Task lifecycle
-
-```text
+### 6.2 Task lifecycle
+```
 CREATED → AUTHORIZING → (WAITING_APPROVAL) → ROUTING → RUNNING → COMPLETED
         ↘ REJECTED          ↘ FAILED
 RUNNING → CANCELLING → CANCELLED
 RUNNING → TIMED_OUT
 ```
 
-#### 6.3 Integration lifecycle
-
-```text
-DISCONNECTED → CONNECTING → HEALTHY → DEGRADED → DISCONNECTED
-                                        ↘ DISABLED
+### 6.3 Integration lifecycle
 ```
+DISCONNECTED → CONNECTING → HEALTHY → DEGRADED → DISCONNECTED
+                                    ↘ DISABLED
+```
+
+---
 
 ## 7. Security requirements (committed v0.1 positions)
 
@@ -151,7 +142,9 @@ The following were open research questions in earlier drafts. For v0.1 each is g
 | Audit integrity | Append-only audit ledger with actor/action/resource/outcome/trace (FR-022). | Tamper-evidence (hash-chaining), formal retention. |
 | Admin access | Distinct operator identity; all admin actions audited (FR-027). | Separation-of-duties, approval-of-admin-actions. |
 
-**Blast-radius requirement (the security test to keep passing):**  if any single agent is fully compromised, the attacker gains only that agent's own Skills and whatever it was already permitted to call — no lateral movement, no external credentials, no admin control (NFR-002).
+> **Blast-radius requirement (the security test to keep passing):** if any single agent is fully compromised, the attacker gains only that agent's own Skills and whatever it was already permitted to call — no lateral movement, no external credentials, no admin control (NFR-002).
+
+---
 
 ## 8. Interface requirements
 
@@ -168,20 +161,22 @@ Exact API and protobuf definitions are specified per subsystem in the LLDs. The 
 | MCP Gateway API | connect_server, disconnect_server, import_capabilities, health, invoke_external_capability |
 | Observability hooks | start/end span, task events, policy events, approval events, audit events |
 
+---
+
 ## 9. Deferred requirements
 
 Public internet-wide discovery; cross-company reputation or marketplace; billing/settlement between organizations; a CoNET-specific global public PKI; semantic Skill discovery using embeddings; federation between separately governed CoNET networks; a universal agent-reasoning framework.
+
+---
 
 ## 10. Acceptance test for v0.1
 
 Run two agents on separate processes (separate machines for the final test):
 
-- Agent B registers Skill math.add.
-- Agent A discovers it without a hard-coded endpoint.
-- Agent A receives authorization and executes via gRPC, receiving a result.
-- A policy denial is demonstrated (unauthorized call refused and audited).
-- Agent B becomes undiscoverable after lease expiry.
-- An administrator cancels an active task without affecting unrelated tasks.
-- A single trace spans the request end to end, and an audit record explains what happened.
-
-*Document 2 of 3 in the CoNET specification set. Companion documents: Project Overview; Architecture & Implementation Plan. Field-level manifest and wire contracts: LLD-01.*
+1. Agent B registers Skill `math.add`.
+2. Agent A discovers it without a hard-coded endpoint.
+3. Agent A receives authorization and executes via gRPC, receiving a result.
+4. A policy denial is demonstrated (unauthorized call refused and audited).
+5. Agent B becomes undiscoverable after lease expiry.
+6. An administrator cancels an active task without affecting unrelated tasks.
+7. A single trace spans the request end to end, and an audit record explains what happened.
