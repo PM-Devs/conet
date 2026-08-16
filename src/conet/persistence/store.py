@@ -27,12 +27,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     task_json TEXT NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at);
 
 CREATE TABLE IF NOT EXISTS audit (
     event_id TEXT PRIMARY KEY,
     event_json TEXT NOT NULL,
     timestamp REAL NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit(timestamp);
 
 CREATE TABLE IF NOT EXISTS approvals (
     approval_id TEXT PRIMARY KEY,
@@ -58,7 +60,11 @@ class Store:
     async def _connection(self) -> aiosqlite.Connection:
         if self._db is None:
             self._db = await aiosqlite.connect(self._db_path)
-            await self._db.execute('PRAGMA foreign_keys = ON')
+                    await self._db.execute('PRAGMA foreign_keys = ON')
+                    # Use WAL to improve concurrent readers/writers and set a busy
+                    # timeout so transient locks don't error immediately.
+                    await self._db.execute('PRAGMA journal_mode = WAL')
+                    await self._db.execute('PRAGMA busy_timeout = 5000')
             await self._db.executescript(_SCHEMA)
             await self._db.commit()
         return self._db

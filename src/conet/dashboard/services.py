@@ -40,6 +40,7 @@ class DashboardServices:
 def build_services(
     db_path: str | None = None,
     users_db_path: str | None = None,
+    use_single_db: bool | None = None,
     nats_url: str | None = None,
     policy_secret: str | None = None,
     policy_path: str | None = None,
@@ -47,7 +48,13 @@ def build_services(
     auth_secret: str | None = None,
     cookie_secure: bool | None = None,
 ) -> DashboardServices:
-    store = Store(db_path or os.environ.get('CONET_DB_PATH', 'conet.db'))
+    # Resolve control DB path (agents/tasks/audit)
+    resolved_db_path = db_path or os.environ.get('CONET_DB_PATH', 'conet.db')
+    # If use_single_db is explicitly requested or env var set, point users DB
+    # at the same file as the control DB. This allows a single-file deployment
+    # for simple demos while preserving the default two-DB separation.
+    resolved_use_single = use_single_db if use_single_db is not None else (os.environ.get('CONET_SINGLE_DB') == '1')
+    store = Store(resolved_db_path)
     event_bus = EventBus(nats_url or os.environ.get('CONET_NATS_URL', 'nats://localhost:4222'))
     policy = PolicyEngine(
         secret_key=policy_secret or os.environ.get('CONET_POLICY_SECRET', 'dev-secret-change-me'),
@@ -59,8 +66,14 @@ def build_services(
     teams = TeamService(role_policy_path=human_roles_policy_path)
     approvals = ApprovalWorkflow(store, teams)
     mcp_gateway = MCPGateway(policy, store)
+    # Resolve users DB path. If single-db mode is active, reuse the control DB
+    # path for users; otherwise prefer explicit users_db_path or env var.
+    resolved_users_db = (
+        resolved_db_path if resolved_use_single else (users_db_path or os.environ.get('CONET_USERS_DB_PATH', 'conet_users.db'))
+    )
+
     auth = create_auth_module(
-        db_path=users_db_path or os.environ.get('CONET_USERS_DB_PATH', 'conet_users.db'),
+        db_path=resolved_users_db,
         secret=auth_secret or os.environ.get('CONET_AUTH_SECRET'),
         cookie_secure=cookie_secure,
     )

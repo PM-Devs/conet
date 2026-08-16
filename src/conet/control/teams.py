@@ -36,6 +36,14 @@ class TeamService:
             raise UnknownRoleError(f'unknown role {role!r}; must be one of {VALID_ROLES}')
         self._enforcer.delete_roles_for_user(user_id)
         self._enforcer.add_role_for_user(user_id, role)
+        try:
+            # Persist role assignment so it survives restarts when using a
+            # writable policy file adapter. If the configured policy path is
+            # inside site-packages this may fail; callers should set
+            # CONET_HUMAN_ROLES_POLICY_PATH to a writable path.
+            self._enforcer.save_policy()
+        except Exception:
+            logger.warning('team: assigned role %s to %s but failed to persist policy (check CONET_HUMAN_ROLES_POLICY_PATH)', role, user_id)
         logger.info('team: %s assigned role %s', user_id, role)
 
     async def invite(self, user_id: str, role: str) -> None:
