@@ -13,5 +13,17 @@
 	bump version and rebuild artifacts. No functional changes beyond
 	packaging metadata.
 
+## 0.2.4 - patch release
+- Retry publishing with updated packaging metadata and small fixes:
+	- Ensure DB initialization and single-DB opt-in are logged at startup.
+	- Enable SQLite WAL mode and add busy timeout + useful indexes for
+		better dashboard streaming under concurrent load.
+	- Persist human role assignments (Casbin policy save) when possible.
+	- Update examples to read DB/NATS configuration from environment.
+
+## 0.2.5 - patch release
+- Rebuild and republish package artifacts to resolve PyPI file conflicts;
+	includes packaging metadata refresh only. No functional changes.
+
 ## 0.2.0 - previous
 - Initial public prototype release.

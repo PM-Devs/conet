@@ -59,14 +59,14 @@ class Store:
 
     async def _connection(self) -> aiosqlite.Connection:
         if self._db is None:
-            self._db = await aiosqlite.connect(self._db_path)
-                    await self._db.execute('PRAGMA foreign_keys = ON')
-                    # Use WAL to improve concurrent readers/writers and set a busy
-                    # timeout so transient locks don't error immediately.
-                    await self._db.execute('PRAGMA journal_mode = WAL')
-                    await self._db.execute('PRAGMA busy_timeout = 5000')
-            await self._db.executescript(_SCHEMA)
-            await self._db.commit()
+                self._db = await aiosqlite.connect(self._db_path)
+                await self._db.execute('PRAGMA foreign_keys = ON')
+                # Use WAL to improve concurrent readers/writers and set a busy
+                # timeout so transient locks don't error immediately.
+                await self._db.execute('PRAGMA journal_mode = WAL')
+                await self._db.execute('PRAGMA busy_timeout = 5000')
+                await self._db.executescript(_SCHEMA)
+                await self._db.commit()
         return self._db
 
     async def close(self) -> None:
