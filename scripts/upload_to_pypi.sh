@@ -35,6 +35,6 @@ if [ ${#files[@]} -eq 0 ]; then
 fi
 
 echo "Uploading to PyPI (only files for version $version)..."
-python -m twine upload --verbose "${files[@]}"
+python -m twine upload --verbose --skip-existing "${files[@]}"
 
 echo "Done."

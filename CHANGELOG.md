@@ -25,5 +25,10 @@
 - Rebuild and republish package artifacts to resolve PyPI file conflicts;
 	includes packaging metadata refresh only. No functional changes.
 
+## 0.2.6 - patch release
+- Bumped to 0.2.6 to publish a fresh set of artifacts after PyPI
+	reported existing matching files for 0.2.5. Includes metadata sync
+	(`__version__`) and packaging helper improvements.
+
 ## 0.2.0 - previous
 - Initial public prototype release.

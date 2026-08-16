@@ -29,6 +29,6 @@ $files = Get-ChildItem -Path dist | Where-Object { $_.Name -like "*-$version*" }
 if (-not $files) { Write-Error "No dist files found for version $version"; exit 1 }
 
 Write-Host "Uploading to PyPI (only files for version $version)..."
-python -m twine upload --verbose $files
+python -m twine upload --verbose --skip-existing $files
 
 Write-Host "Done."
