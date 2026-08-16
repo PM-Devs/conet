@@ -5,33 +5,50 @@
   <title>{% block title %}CoNET{% endblock %} — Operator Console</title>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace; margin: 0; display: flex; min-height: 100vh; }
-    nav { width: 190px; flex-shrink: 0; border-right: 1px solid #8884; padding: 1rem; }
-    nav a { display: block; padding: .4rem 0; text-decoration: none; color: inherit; }
-    nav a.active { font-weight: bold; text-decoration: underline; }
-    main { flex: 1; padding: 1.25rem 1.5rem; max-width: 1100px; }
+    :root {
+      --bg-1: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+      --panel: rgba(255,255,255,0.04);
+      --muted: rgba(255,255,255,0.65);
+      --accent: #7c5cff;
+      color-scheme: light dark;
+    }
+    html,body { height: 100%; }
+    body { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace; margin: 0; display: flex; min-height: 100vh; background: var(--bg-1); color: #e6eef8; }
+    nav { width: 220px; flex-shrink: 0; background: linear-gradient(180deg, rgba(124,92,255,0.12), rgba(0,0,0,0.06)); padding: 1.25rem; box-shadow: 2px 0 8px rgba(0,0,0,0.35); }
+    nav strong { display:block; font-size:1.1rem; margin-bottom:.25rem; color: white; }
+    nav p.muted { color: var(--muted); margin-top:0.25rem; margin-bottom:0.75rem; font-size: .875rem; }
+    nav a { display: block; padding: .6rem .5rem; text-decoration: none; color: var(--muted); border-radius: 6px; margin: .25rem 0; transition: background .15s, color .15s, transform .05s; }
+    nav a:hover { background: rgba(255,255,255,0.03); color: #fff; transform: translateX(2px); }
+    nav a.active { color: white; font-weight: 700; background: linear-gradient(90deg, rgba(124,92,255,0.16), rgba(124,92,255,0.06)); box-shadow: inset 2px 0 0 var(--accent); }
+    main { flex: 1; padding: 1.5rem; max-width: 1200px; }
+    .page { background: rgba(255,255,255,0.02); border-radius: 10px; padding: 1.25rem; box-shadow: 0 6px 30px rgba(2,6,23,0.6); }
     table { border-collapse: collapse; width: 100%; margin: .75rem 0; }
-    th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid #8883; font-size: .9rem; }
-    .status-ok, .status-completed { color: #2a2; }
-    .status-denied, .status-failed, .status-rejected, .status-timed_out { color: #c33; }
-    .status-pending, .status-waiting_approval, .status-running, .status-routing, .status-authorizing { color: #c90; }
-    .status-cancelled, .status-cancelling { color: #888; }
+    th, td { text-align: left; padding: .45rem .8rem; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: .95rem; color: #d8e6ff; }
+    .status-ok, .status-completed { color: #6fe3a4; }
+    .status-denied, .status-failed, .status-rejected, .status-timed_out { color: #ff8b8b; }
+    .status-pending, .status-waiting_approval, .status-running, .status-routing, .status-authorizing { color: #ffd97a; }
+    .status-cancelled, .status-cancelling { color: #9aa3b2; }
     form.inline { display: inline; }
-    button { font-family: inherit; cursor: pointer; }
-    .card { border: 1px solid #8884; border-radius: 6px; padding: .75rem 1rem; margin-bottom: 1rem; }
-    .muted { opacity: .65; font-size: .85rem; }
-    .stats-strip { display: flex; gap: 1.5rem; margin: .5rem 0 1rem; }
-    .stat { border: 1px solid #8884; border-radius: 6px; padding: .5rem .9rem; }
-    .stat .n { font-size: 1.3rem; font-weight: bold; display: block; }
-    .stat .label { font-size: .75rem; opacity: .65; }
-    .stat.warn .n { color: #c33; }
-    #graph { width: 100%; height: 360px; border: 1px solid #8884; border-radius: 6px; }
-    #graph text { font-size: 11px; font-family: inherit; }
+    button { font-family: inherit; cursor: pointer; border: none; background: var(--accent); color: white; padding: .4rem .6rem; border-radius: 6px; }
+    button.alt { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: var(--muted); }
+    .card { background: rgba(255,255,255,0.02); border-radius: 8px; padding: .85rem 1rem; margin-bottom: 1rem; border-left: 3px solid rgba(255,255,255,0.02); }
+    .muted { opacity: .75; font-size: .9rem; color: var(--muted); }
+    .stats-strip { display: flex; gap: 1rem; margin: .5rem 0 1rem; }
+    .stat { border-radius: 8px; padding: .6rem .9rem; background: rgba(255,255,255,0.02); width: 140px; }
+    .stat .n { font-size: 1.2rem; font-weight: 700; display: block; color: white; }
+    .stat .label { font-size: .75rem; color: var(--muted); }
+    .stat.warn .n { color: #ffb4a6; }
+    #graph { width: 100%; height: 360px; border-radius: 8px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00)); }
+    #graph text { font-size: 11px; font-family: inherit; fill: #e6eef8; }
     #graph .node circle { stroke-width: 1.5px; }
-    #graph .edge { stroke: #8886; fill: none; }
+    #graph .edge { stroke: rgba(255,255,255,0.06); fill: none; }
     #graph .edge.warm { stroke: #f9a825; }
     #graph .edge.hot { stroke: #ea4335; }
+    @media (max-width: 880px) {
+      nav { display:none; }
+      body { flex-direction: column; }
+      main { padding: 1rem; }
+    }
   </style>
 </head>
 <body>
