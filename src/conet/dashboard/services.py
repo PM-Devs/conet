@@ -40,7 +40,7 @@ class DashboardServices:
 def build_services(
     db_path: str | None = None,
     users_db_path: str | None = None,
-    use_single_db: bool | None = None,
+    use_single_db: bool | None = True,
     nats_url: str | None = None,
     policy_secret: str | None = None,
     policy_path: str | None = None,
@@ -50,9 +50,9 @@ def build_services(
 ) -> DashboardServices:
     # Resolve control DB path (agents/tasks/audit)
     resolved_db_path = db_path or os.environ.get('CONET_DB_PATH', 'conet.db')
-    # If use_single_db is explicitly requested or env var set, point users DB
-    # at the same file as the control DB. This allows a single-file deployment
-    # for simple demos while preserving the default two-DB separation.
+    # By default use a single DB for both control plane and users to make
+    # local/demo runs simpler. To opt out, pass use_single_db=False or set
+    # CONET_SINGLE_DB=0 in the environment.
     resolved_use_single = use_single_db if use_single_db is not None else (os.environ.get('CONET_SINGLE_DB') == '1')
     store = Store(resolved_db_path)
     event_bus = EventBus(nats_url or os.environ.get('CONET_NATS_URL', 'nats://localhost:4222'))
