@@ -1,8 +1,9 @@
 import asyncio
+
 from fastapi.testclient import TestClient
 
-from conet.dashboard.services import build_services
 from conet.dashboard.app import create_dashboard_app
+from conet.dashboard.services import build_services
 
 
 def test_dashboard_register_page(tmp_path):

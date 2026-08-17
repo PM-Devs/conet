@@ -43,7 +43,13 @@ class TeamService:
             # CONET_HUMAN_ROLES_POLICY_PATH to a writable path.
             self._enforcer.save_policy()
         except Exception:
-            logger.warning('team: assigned role %s to %s but failed to persist policy (check CONET_HUMAN_ROLES_POLICY_PATH)', role, user_id)
+            logger.warning(
+                'team: assigned role %s to %s but failed to persist policy '
+                '(check CONET_HUMAN_ROLES_POLICY_PATH)',
+                role,
+                user_id,
+                exc_info=True,
+            )
         logger.info('team: %s assigned role %s', user_id, role)
 
     async def invite(self, user_id: str, role: str) -> None:

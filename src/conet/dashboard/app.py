@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from conet.control.auth import User
 from conet.control.teams import VALID_ROLES
 from conet.dashboard.services import DashboardServices
+from conet.observability.tracing import audit
 
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
@@ -102,6 +103,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
             # them here so the first user can actually use the role-gated
             # panels, not just hold an auth-level flag nothing here reads.
             await services.teams.assign_role(str(user.id), 'Owner')
+        await audit(
+            services.store, actor=str(user.id), action='create_user', resource=str(user.id),
+            outcome='OK', metadata={'email': user.email},
+        )
         token = await cookie_strategy.write_token(user)
         response = RedirectResponse('/dashboard/network', status_code=status.HTTP_303_SEE_OTHER)
         set_login_cookie(response, token)
@@ -177,6 +182,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
     ):
         await require(user, 'manage_policy')
         services.policy.add_policy_rule(subject, skill_id, action)
+        await audit(
+            services.store, actor=str(user.id), action='policy_add', resource=skill_id,
+            outcome='OK', metadata={'subject': subject, 'action': action},
+        )
         return RedirectResponse('/dashboard/policy', status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post('/dashboard/policy/remove')
@@ -186,6 +195,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
     ):
         await require(user, 'manage_policy')
         services.policy.remove_policy_rule(subject, skill_id, action)
+        await audit(
+            services.store, actor=str(user.id), action='policy_remove', resource=skill_id,
+            outcome='OK', metadata={'subject': subject, 'action': action},
+        )
         return RedirectResponse('/dashboard/policy', status_code=status.HTTP_303_SEE_OTHER)
 
     @app.get('/dashboard/policy/explain')
@@ -260,12 +273,20 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
 
         await services.mcp_gateway.connect_server(server_name, command=command, args=parsed_args, env=parsed_env or None)
         await services.mcp_gateway.import_capabilities(server_name)
+        await audit(
+            services.store, actor=str(user.id), action='integration_connect', resource=server_name,
+            outcome='OK', metadata={'command': command},
+        )
         return RedirectResponse('/dashboard/integrations', status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post('/dashboard/integrations/disconnect')
     async def integrations_disconnect(server_name: str = Form(...), user: User = Depends(current_user)):
         await require(user, 'manage_integrations')
         await services.mcp_gateway.disconnect_server(server_name)
+        await audit(
+            services.store, actor=str(user.id), action='integration_disconnect', resource=server_name,
+            outcome='OK',
+        )
         return RedirectResponse('/dashboard/integrations', status_code=status.HTTP_303_SEE_OTHER)
 
     # --- team & accounts (§A1/§A2) ---
@@ -284,6 +305,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
     async def team_assign(user_id: str = Form(...), role: str = Form(...), user: User = Depends(current_user)):
         await require(user, 'manage_team')
         await services.teams.assign_role(user_id, role)
+        await audit(
+            services.store, actor=str(user.id), action='assign_role', resource=user_id,
+            outcome='OK', metadata={'role': role},
+        )
         return RedirectResponse('/dashboard/team', status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post('/dashboard/team/invite')
@@ -295,6 +320,10 @@ def create_dashboard_app(services: DashboardServices) -> FastAPI:
         temp_password = secrets.token_urlsafe(12)
         invitee = await user_manager.create(auth.UserCreate(email=email, password=temp_password))
         await services.teams.invite(str(invitee.id), role)
+        await audit(
+            services.store, actor=str(user.id), action='invite_user', resource=str(invitee.id),
+            outcome='OK', metadata={'email': email, 'role': role},
+        )
 
         can_manage = True
         users = await auth.list_users()

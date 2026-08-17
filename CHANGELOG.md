@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.8 - patch release
+- Add auditable dashboard actions for account creation, policy changes,
+  integration management, and team administration.
+- Make audit-write failures visible instead of silently discarding them.
+- Improve diagnostic logging when human-role policy persistence fails.
+
 ## 0.2.2 - patch release
 - Ensure dashboard user DB schema is initialized at startup so the first
 	account can be created (fixes `no such table: user`).

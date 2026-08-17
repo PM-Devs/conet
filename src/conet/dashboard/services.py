@@ -1,5 +1,5 @@
-import os
 import asyncio
+import os
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -80,12 +80,7 @@ def build_services(
 
     # Ensure the users DB schema is created before the dashboard serves requests.
     # create_db_and_tables is an async helper returned by create_auth_module.
-    try:
-        asyncio.run(auth.create_db_and_tables())
-    except Exception:
-        # If table creation fails here, let callers handle the error —
-        # failing fast is preferable to later hitting "no such table: user".
-        raise
+    asyncio.run(auth.create_db_and_tables())
 
     return DashboardServices(
         store=store, event_bus=event_bus, policy=policy, registry=registry, discovery=discovery,
